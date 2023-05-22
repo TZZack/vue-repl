@@ -40,7 +40,7 @@ export async function compileFile(
     if (filename.endsWith('.ts')) {
       code = await transformTS(code)
     }
-    compiled.js = compiled.ssr = code
+    compiled.js = compiled.ssr = transformImportPath(filename, code)
     store.state.errors = []
     return
   }
@@ -168,7 +168,7 @@ export async function compileFile(
       `\n${COMP_IDENTIFIER}.__file = ${JSON.stringify(filename)}` +
         `\nexport default ${COMP_IDENTIFIER}`
     )
-    compiled.js = clientCode.trimStart()
+    compiled.js = transformImportPath(filename, clientCode.trimStart())
     compiled.ssr = ssrCode.trimStart()
   }
 
@@ -309,4 +309,67 @@ async function doCompileTemplate(
   }
 
   return code
+}
+
+// 获取代码里面所有相对路径
+function getRelativeImportPaths(code: string): string[] {
+  const importRegex = /import\s+.*?\s+from\s+['"](.*?)['"]/g;
+    const imports = [];
+    let match;
+    while ((match = importRegex.exec(code)) !== null) {
+      imports.push(match[1]);
+    }
+    const relativeImports = imports.filter(path => path.startsWith('.'));
+    return relativeImports;
+}
+
+// 减掉路径最后一层
+function cutPath(path: string) {
+  const index = path.lastIndexOf('/')
+  if (index === -1) { // 根目录
+    return ''
+  }
+  return path.slice(0, index)
+}
+
+// 把路径根据当前文件名转换成完整路径
+function transformToFullPath (filename: string, relativePath: string) {
+  // 截取当前文件的路径
+  let curPath = cutPath(filename)
+  
+  // 分两种情况
+  // 1. 返回上一层的，若干个../
+  if (relativePath.startsWith('..')) {
+    let tempPath = relativePath
+    while(tempPath.startsWith('..')) {
+      tempPath = tempPath.slice(3) // 去掉一层`../`
+      curPath = cutPath(curPath)
+    }
+    return './' + curPath + tempPath
+  } else if (relativePath.startsWith('.')) {
+    // 2. 当前层的./，直接拼接即可（原来的路径先去掉./）
+    return './' + curPath + relativePath.slice(2)
+  }
+
+  return relativePath
+}
+
+/**
+ * 把所有import的相对路径都转换成完整路径
+ * @param filename 当前文件名（完整路径）
+ * @param code 文件代码
+ */
+function transformImportPath(filename: string, code: string) {
+  // 如果当前文件是在根目录，则不需要处理
+  if (!filename.includes('/')) {
+    return code
+  }
+
+  const relativePaths = getRelativeImportPaths(code)
+  relativePaths.forEach(path => {
+    const fullPath = transformToFullPath(filename, path)
+    code = code.replaceAll(path, fullPath)
+  })
+
+  return code;
 }

@@ -11,7 +11,9 @@ import {
 import { ExportSpecifier, Identifier, Node } from '@babel/types'
 
 export function compileModulesForPreview(store: Store, isSSR = false) {
+  // 表示已经处理过的文件集合
   const seen = new Set<File>()
+  // 已编译处理过的模块
   const processed: string[] = []
   processFile(
     store,
@@ -56,6 +58,7 @@ function processFile(
   }
   seen.add(file)
 
+  // 处理html文件
   if (!isSSR && file.filename.endsWith('.html')) {
     return processHtmlFile(store, file.code, file.filename, processed, seen)
   }
@@ -79,6 +82,7 @@ function processFile(
   processed.push(js)
 }
 
+// 处理模块
 function processModule(
   store: Store,
   src: string,
@@ -86,6 +90,7 @@ function processModule(
 ): [string, Set<string>] {
   const s = new MagicString(src)
 
+  // 解析成ast
   const ast = babelParse(src, {
     sourceFilename: filename,
     sourceType: 'module'
