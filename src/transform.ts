@@ -345,9 +345,11 @@ function transformToFullPath (filename: string, relativePath: string) {
       tempPath = tempPath.slice(3) // 去掉一层`../`
       curPath = cutPath(curPath)
     }
+    curPath = curPath ? curPath + '/' : curPath
     return './' + curPath + tempPath
   } else if (relativePath.startsWith('.')) {
     // 2. 当前层的./，直接拼接即可（原来的路径先去掉./）
+    curPath = curPath ? curPath + '/' : curPath
     return './' + curPath + relativePath.slice(2)
   }
 
